@@ -1,51 +1,49 @@
-# Sentinel — Hackathon Mobile Prototype
+# Sentinel — Personal Safety Intelligence
 
-**Sentinel** is a proactive personal-safety intelligence prototype built with Expo + React Native + TypeScript.
+Sentinel is an Expo + React Native + TypeScript mobile application for community incident reporting, proactive safety context, emergency assistance, alerts, and community information.
 
-The differentiator is not simply a crime map. Sentinel takes incident observations and turns them into **contextual safety information** through Safety Mode, while clearly separating unverified community reports from corroborated/official information.
+## Run the app
 
-## What works in this ZIP
+Requirements: Node.js 22.13.x or newer and Expo Go on the Android phone.
 
-- Interactive map with sample incident markers and category filters
-- Incident reporting that immediately updates the map and alerts feed
-- Safety Mode using the phone's foreground GPS
-- A deterministic proactive-risk check for recent incidents within 1.5 km
-- A **Demo Route Alert** for a guaranteed hackathon demonstration
-- Test emergency/panic flow that captures GPS and records a local/Supabase event
-- Alerts feed
-- News/community feed with source labels
-- Supabase-ready incident and emergency persistence
-- Local demo fallback: the app works without Supabase
-
-## Important safety statement
-
-This is a hackathon prototype. The emergency button **does not contact SAPS, medical services, private security, or any other responder**. Preloaded incident data is fictional demo data.
-
-## Requirements
-
-Current Expo SDK 57 requires Node.js 22.13.x or newer in the SDK 57 documentation.
-
-Install:
-
-```bash
+```cmd
 npm install
-npx expo start
-```
-
-Then scan the QR code with Expo Go on a compatible device.
-
-If package versions need reconciliation on your machine:
-
-```bash
 npx expo install --fix
+npx expo start -c
 ```
 
-## Optional Supabase setup
+If PowerShell blocks npm/npx scripts, use Command Prompt in VS Code or run `npm.cmd` / `npx.cmd`.
 
-The app runs without Supabase. To enable cloud persistence:
+## Current features
+
+- Safe-area-aware Android layout so content stays below the status bar and above Android navigation controls.
+- Large bottom navigation targets.
+- Safety map implemented with a WebView + Leaflet/OpenStreetMap to avoid the black native-map issue seen on some Expo Go Android devices.
+- Incident reporting with category, description, location and an **optional image** from the camera or gallery.
+- Alerts and community/news feed.
+- Safety Mode and Sentinel Agent.
+- Large panic button at the top of the Home screen.
+- Panic activation captures GPS and begins **visible emergency audio recording** after microphone permission is granted.
+- SOS message composer pre-filled for **0736598718** with current coordinates and a Google Maps link.
+- Emergency call action opens the dialer for **0736598718**.
+- Optional Supabase persistence and realtime incident updates.
+
+## Emergency behaviour
+
+Mobile operating systems do not allow an Expo Go app to silently send an SMS or silently place a phone call. Sentinel therefore prepares the SOS message and opens the phone's Messages app, where the user confirms Send. The call action opens the phone dialer, where the user confirms the call.
+
+The configured emergency contact in this build is `0736598718`. Before wider deployment, move emergency contacts into authenticated user settings and integrate only with authorised emergency-response services.
+
+Emergency audio is **not hidden listening**. Recording starts only after the user activates panic mode and grants microphone permission, and Sentinel displays a visible recording indicator and Stop control. In the Expo Go configuration used here, recording is foreground-only.
+
+## Image attachments
+
+Selected incident images are displayed immediately in the current app session. The database schema includes `image_uri`, but local device file URIs are not uploaded to Supabase Storage automatically. Add a private storage bucket/upload pipeline before relying on attachments across multiple devices.
+
+## Optional Supabase
 
 1. Create a Supabase project.
-2. Run `sql/schema.sql` in the Supabase SQL editor.
+2. Run `sql/schema.sql` in the SQL editor.
 3. Copy `.env.example` to `.env`.
 4. Fill in:
 
@@ -54,88 +52,16 @@ EXPO_PUBLIC_SUPABASE_URL=...
 EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
-5. Restart Expo.
+5. Restart Expo with `npx expo start -c`.
 
-**Never put a Supabase service-role key in a mobile app.**
+Never place a Supabase service-role key or AI provider secret inside the mobile application.
 
-## Four-hour demo flow
+## Main project areas
 
-1. Open **Home** and explain Sentinel's proactive-safety proposition.
-2. Open **Report**, submit a sample robbery/hijacking report.
-3. Open **Map** and show that the new report appears immediately.
-4. Open **Alerts** and show the automatically-created unverified report alert.
-5. Return to **Home → Demo route alert** to demonstrate personalised/contextual safety intelligence.
-6. Trigger the **test emergency distress** flow and show captured location + timestamp.
-7. Finish on **Community** to explain official/community source separation.
-
-## Team split
-
-### Person 1 — Map + reporting
-Primary areas:
-- `App.tsx` map/report screens
-- `components/IncidentCard.tsx`
-- UI refinement for map markers and filters
-
-### Person 2 — Backend + GPS + emergency (your area)
-Primary files:
-- `lib/supabase.ts`
-- `lib/location.ts`
-- `lib/types.ts`
-- `services/incidents.ts`
-- `services/emergency.ts`
-- `services/safety.ts`
-- `sql/schema.sql`
-
-Your success condition:
-
-`Report → local state/Supabase → map + alert` and `Panic → GPS → test emergency event`.
-
-### Person 3 — Alerts + community + presentation polish
-Primary areas:
-- Alerts screen in `App.tsx`
-- Community screen in `App.tsx`
-- `data/demoData.ts`
-- Copy, labels, demo content and presentation flow
-
-## Recommended VS Code extensions
-
-The repo includes `.vscode/extensions.json` for:
-
-- ESLint
-- Prettier
-- Expo Tools
-- GitLens
-- Error Lens
-
-## Architecture
-
-```text
-Citizen / observer
-      |
-      v
-React Native + Expo
-  |      |       |
-Report  Safety  Emergency
-  |      Mode     GPS
-  |       |       |
-  +-------+-------+
-          |
-     Shared local state
-          |
-     Optional Supabase
-          |
-   Map + Alerts + Feed
-```
-
-## Deliberately not included in the 4-hour build
-
-- Real emergency dispatch
-- SAPS/prosecutor integration
-- Background GPS
-- Automated criminal identification
-- Production authentication
-- Predictive policing
-- Dynamic route rerouting
-- Advanced AI agent orchestration
-
-These belong in the roadmap, not the hackathon MVP.
+- `App.tsx` — screens, navigation and emergency UI
+- `components/SentinelMap.tsx` — Leaflet/OpenStreetMap map
+- `components/EmergencyButton.tsx` — large panic control
+- `hooks/useEmergencyAudio.ts` — microphone recording
+- `services/emergency.ts` — location alert, SOS message and call actions
+- `services/incidents.ts` — incident persistence
+- `sql/schema.sql` — Supabase schema

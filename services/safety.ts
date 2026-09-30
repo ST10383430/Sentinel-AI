@@ -24,8 +24,9 @@ export function findRelevantIncidents(
   location: Coords,
   incidents: Incident[],
   radiusKm = 1.5,
+  hoursBack = 12,
 ) {
-  const cutoff = Date.now() - 12 * 60 * 60 * 1000;
+  const cutoff = Date.now() - hoursBack * 60 * 60 * 1000;
 
   return incidents
     .map((incident) => ({

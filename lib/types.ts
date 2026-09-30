@@ -18,6 +18,7 @@ export type Incident = {
   status: VerificationStatus;
   created_at: string;
   source?: 'community' | 'official' | 'demo';
+  image_uri?: string | null;
 };
 
 export type SafetyNotification = {
@@ -32,7 +33,7 @@ export type EmergencyAlert = {
   id: string;
   latitude: number;
   longitude: number;
-  status: 'test_triggered';
+  status: 'triggered';
   created_at: string;
 };
 

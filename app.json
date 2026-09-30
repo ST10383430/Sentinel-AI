@@ -8,16 +8,32 @@
     "scheme": "sentinel",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hackathon.sentinel"
+      "bundleIdentifier": "com.sentinel.safety"
     },
     "android": {
-      "package": "com.hackathon.sentinel"
+      "package": "com.sentinel.safety"
     },
     "plugins": [
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Sentinel to use your location for safety context and test emergency alerts."
+          "locationWhenInUsePermission": "Allow Sentinel to use your location for safety context and emergency alerts."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Sentinel to access photos you choose to attach to incident reports.",
+          "cameraPermission": "Allow Sentinel to use the camera to attach an image to an incident report."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Sentinel to record emergency audio when you activate the panic feature.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
         }
       ]
     ]

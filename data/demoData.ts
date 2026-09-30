@@ -44,7 +44,7 @@ export const demoIncidents: Incident[] = [
   {
     id: 'demo-4',
     category: 'Kidnapping',
-    description: 'Historical demo incident used to show time/category filtering.',
+    description: 'Historical sample incident used to show time and category filtering.',
     latitude: -26.216,
     longitude: 28.039,
     severity: 'high',
@@ -64,8 +64,8 @@ export const demoNotifications: SafetyNotification[] = [
   },
   {
     id: 'notice-2',
-    title: 'Demo data active',
-    message: 'All preloaded incident records are fictional hackathon demonstration data.',
+    title: 'Sample data active',
+    message: 'Preloaded incident records are fictional sample data for initial application setup.',
     type: 'system',
     created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
   }
