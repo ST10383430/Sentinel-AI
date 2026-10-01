@@ -65,3 +65,30 @@ Never place a Supabase service-role key or AI provider secret inside the mobile 
 - `services/emergency.ts` — location alert, SOS message and call actions
 - `services/incidents.ts` — incident persistence
 - `sql/schema.sql` — Supabase schema
+
+## Privacy + hotspot update
+
+This build adds:
+- public/private visibility per incident report
+- independent public/private visibility per attached photo
+- public Community feed filtering
+- blurred public evidence images with tap-to-reveal
+- frequency-coloured map markers: green = 1, amber = 2, red = 3+ reports within ~750 m in the last 7 days, grey = older
+- preloaded sample incident clusters for demonstrating the map frequency key
+- 2 km foreground Safety Mode alerts recorded in Sentinel's in-app Alerts feed in the Expo Go build
+
+After pulling this build, run:
+
+```bash
+npm install
+npx expo install --fix
+npx expo start -c
+```
+
+If you already created the Supabase tables with an older Sentinel schema, rerun `sql/schema.sql` so the `visibility` and `image_visibility` columns are added.
+
+Local Android notifications work in Expo Go; Sentinel does not request a remote push token. Background hotspot monitoring still requires a development/production build later.
+
+## Expo Go notification note
+
+This project intentionally does not load `expo-notifications` while running through Expo Go on Android. Safety alerts are still created in Sentinel's in-app Alerts feed. Native notification-tray alerts will be enabled when Sentinel moves to a custom development or production build, where the notification module can be configured against Sentinel's own Android application binary.

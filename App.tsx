@@ -21,7 +21,7 @@ import { SentinelProvider, useSentinel } from './context/SentinelContext';
 import { communityPosts, DEMO_REGION } from './data/demoData';
 import { ensureLocationPermission, getCurrentLocation } from './lib/location';
 import { useSafetyMode } from './hooks/useSafetyMode';
-import { IncidentCategory } from './lib/types';
+import { IncidentCategory, Visibility } from './lib/types';
 import { AgentResult, runAgent } from './services/agent';
 import { createEmergencyAlert, EMERGENCY_CONTACT_NUMBER, openEmergencyCall, openSosMessage } from './services/emergency';
 import { useEmergencyAudio } from './hooks/useEmergencyAudio';
@@ -98,7 +98,7 @@ function HomeScreen({ go, safety }: { go: Go; safety: SafetyMode }) {
         <View style={styles.metric}><Text style={styles.metricValue}>{incidents.filter((x) => x.status !== 'unverified').length}</Text><Text style={styles.metricLabel}>corroborated / official</Text></View>
       </View>
 
-      <Text style={styles.footnote}>Preloaded records are sample data and are clearly labelled by verification status.</Text>
+      <Text style={styles.footnote}>Report verification status is shown throughout Sentinel so community observations are not presented as confirmed facts.</Text>
     </ScrollView>
   );
 }
@@ -112,7 +112,13 @@ function MapScreen({ focus }: { focus: Focus }) {
     latitude: focus?.latitude ?? DEMO_REGION.latitude,
     longitude: focus?.longitude ?? DEMO_REGION.longitude,
   });
-  const visible = useMemo(() => selected === 'All' ? incidents : incidents.filter((x) => x.category === selected), [incidents, selected]);
+
+  // Private reports never expose an individual marker/location on the public map.
+  const publicIncidents = useMemo(() => incidents.filter((x) => x.visibility !== 'private'), [incidents]);
+  const visible = useMemo(
+    () => selected === 'All' ? publicIncidents : publicIncidents.filter((x) => x.category === selected),
+    [publicIncidents, selected],
+  );
 
   useEffect(() => {
     if (focus) setMapCenter({ latitude: focus.latitude, longitude: focus.longitude });
@@ -141,7 +147,7 @@ function MapScreen({ focus }: { focus: Focus }) {
   return (
     <View style={styles.flex}>
       <View style={styles.mapHeader}>
-        <Header eyebrow="COMMUNITY INTELLIGENCE" title="Safety map" subtitle="Reports are observations, not proof of criminal activity." />
+        <Header eyebrow="COMMUNITY INTELLIGENCE" title="Safety map" subtitle="Marker colour reflects recent report frequency in the surrounding area." />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           {(['All', ...categories] as const).map((category) => (
             <Pressable key={category} onPress={() => setSelected(category)} style={[styles.filter, selected === category && styles.filterActive]}>
@@ -149,12 +155,47 @@ function MapScreen({ focus }: { focus: Focus }) {
             </Pressable>
           ))}
         </ScrollView>
+        <View style={styles.frequencyLegend}>
+          <Text style={styles.frequencyLegendTitle}>MAP COLOUR KEY · LAST 7 DAYS</Text>
+          <View style={styles.frequencyLegendRow}>
+            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#22C55E' }]} /><Text style={styles.legendText}>1 report</Text></View>
+            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} /><Text style={styles.legendText}>2 reports</Text></View>
+            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} /><Text style={styles.legendText}>3+ reports</Text></View>
+            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#64748B' }]} /><Text style={styles.legendText}>Older</Text></View>
+          </View>
+          <Text style={styles.frequencyLegendNote}>Frequency is calculated from reports within roughly 750 m. It indicates report activity, not certainty that a crime will occur.</Text>
+        </View>
       </View>
       <SentinelMap incidents={visible} center={mapCenter} userLocation={userLocation} />
       <Pressable style={styles.locateButton} onPress={centreOnMe} disabled={locating}>
         <Text style={styles.locateText}>{locating ? '…' : '◎'}</Text>
       </Pressable>
-      <View style={styles.mapLegend}><Text style={styles.mapLegendText}>{visible.length} visible report{visible.length === 1 ? '' : 's'} · OpenStreetMap</Text></View>
+      <View style={styles.mapLegend}><Text style={styles.mapLegendText}>{visible.length} public report{visible.length === 1 ? '' : 's'} visible · OpenStreetMap</Text></View>
+    </View>
+  );
+}
+
+function PrivacyChoice({
+  value,
+  onChange,
+  publicLabel,
+  privateLabel,
+}: {
+  value: Visibility;
+  onChange: (value: Visibility) => void;
+  publicLabel: string;
+  privateLabel: string;
+}) {
+  return (
+    <View style={styles.privacyChoiceRow}>
+      <Pressable onPress={() => onChange('public')} style={[styles.privacyChoice, value === 'public' && styles.privacyChoiceActive]}>
+        <Text style={[styles.privacyChoiceTitle, value === 'public' && styles.privacyChoiceTitleActive]}>Public</Text>
+        <Text style={[styles.privacyChoiceText, value === 'public' && styles.privacyChoiceTextActive]}>{publicLabel}</Text>
+      </Pressable>
+      <Pressable onPress={() => onChange('private')} style={[styles.privacyChoice, value === 'private' && styles.privacyChoiceActive]}>
+        <Text style={[styles.privacyChoiceTitle, value === 'private' && styles.privacyChoiceTitleActive]}>Private</Text>
+        <Text style={[styles.privacyChoiceText, value === 'private' && styles.privacyChoiceTextActive]}>{privateLabel}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -166,6 +207,8 @@ function ReportScreen({ go }: { go: Go }) {
   const [coords, setCoords] = useState({ latitude: DEMO_REGION.latitude, longitude: DEMO_REGION.longitude });
   const [busy, setBusy] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [reportVisibility, setReportVisibility] = useState<Visibility>('private');
+  const [imageVisibility, setImageVisibility] = useState<Visibility>('private');
 
   async function addImage(source: 'library' | 'camera') {
     try {
@@ -204,18 +247,33 @@ function ReportScreen({ go }: { go: Go }) {
     }
     setBusy(true);
     try {
-      const { incident, synced } = await addIncident({ category, description: description.trim(), ...coords, image_uri: imageUri });
+      const { incident, synced } = await addIncident({
+        category,
+        description: description.trim(),
+        ...coords,
+        image_uri: imageUri,
+        visibility: reportVisibility,
+        image_visibility: imageUri ? imageVisibility : 'private',
+      });
+
+      const wasPublic = reportVisibility === 'public';
       setDescription('');
       setImageUri(null);
+      setReportVisibility('private');
+      setImageVisibility('private');
+
+      const storageText = synced ? 'saved securely' : 'kept in this app session';
       Alert.alert(
         'Report recorded',
-        synced
-          ? 'The report is marked unverified, is visible on the map, and was saved to the cloud.'
-          : 'The report is marked unverified and is visible on the map in this session (not saved to the cloud).',
-        [
-          { text: 'View map', onPress: () => go('Map', { latitude: incident.latitude, longitude: incident.longitude }) },
-          { text: 'OK' },
-        ],
+        wasPublic
+          ? `The unverified report is public and can appear on the map/community feed. It was ${storageText}.`
+          : `The unverified report is private and will not appear on the public map or community feed. It was ${storageText}.`,
+        wasPublic
+          ? [
+              { text: 'View map', onPress: () => go('Map', { latitude: incident.latitude, longitude: incident.longitude }) },
+              { text: 'OK' },
+            ]
+          : [{ text: 'OK' }],
       );
     } finally {
       setBusy(false);
@@ -225,7 +283,8 @@ function ReportScreen({ go }: { go: Go }) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <Header eyebrow="OBSERVE · RECORD · REVIEW" title="Report an incident" subtitle="Only include information you are permitted to share. Avoid publishing victim identities or sensitive personal information." />
+        <Header eyebrow="OBSERVE · RECORD · REVIEW" title="Report an incident" subtitle="You control what is shared publicly. Private reports and private photos are excluded from the public community feed." />
+
         <Text style={styles.inputLabel}>Incident category</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRowNoPad}>
           {categories.map((item) => (
@@ -245,29 +304,40 @@ function ReportScreen({ go }: { go: Go }) {
           placeholderTextColor="#98A5AC"
         />
 
+        <Text style={styles.inputLabel}>Who can see this report?</Text>
+        <PrivacyChoice
+          value={reportVisibility}
+          onChange={setReportVisibility}
+          publicLabel="Can appear on the safety map and Community feed."
+          privateLabel="Kept out of public map and Community records."
+        />
 
         <Text style={styles.inputLabel}>Image (optional)</Text>
         <View style={styles.imagePickerCard}>
           {imageUri ? <Image source={{ uri: imageUri }} style={styles.reportImagePreview} resizeMode="cover" /> : (
             <View style={styles.imagePlaceholder}>
               <Text style={styles.imagePlaceholderIcon}>▧</Text>
-              <Text style={styles.imagePlaceholderText}>Attach a photo if it helps document the incident.</Text>
+              <Text style={styles.imagePlaceholderText}>Attach a photo if it helps document the incident. A photo is never required to submit.</Text>
             </View>
           )}
           <View style={styles.imageActionRow}>
-            <Pressable style={styles.imageActionButton} onPress={() => addImage('library')}>
-              <Text style={styles.imageActionText}>Choose photo</Text>
-            </Pressable>
-            <Pressable style={styles.imageActionButton} onPress={() => addImage('camera')}>
-              <Text style={styles.imageActionText}>Take photo</Text>
-            </Pressable>
-            {imageUri ? (
-              <Pressable style={styles.imageRemoveButton} onPress={() => setImageUri(null)}>
-                <Text style={styles.imageRemoveText}>Remove</Text>
-              </Pressable>
-            ) : null}
+            <Pressable style={styles.imageActionButton} onPress={() => addImage('library')}><Text style={styles.imageActionText}>Choose photo</Text></Pressable>
+            <Pressable style={styles.imageActionButton} onPress={() => addImage('camera')}><Text style={styles.imageActionText}>Take photo</Text></Pressable>
+            {imageUri ? <Pressable style={styles.imageRemoveButton} onPress={() => setImageUri(null)}><Text style={styles.imageRemoveText}>Remove</Text></Pressable> : null}
           </View>
         </View>
+
+        {imageUri ? (
+          <>
+            <Text style={styles.inputLabel}>Who can see this photo?</Text>
+            <PrivacyChoice
+              value={imageVisibility}
+              onChange={setImageVisibility}
+              publicLabel="If the report is public, the photo appears blurred until a viewer taps it."
+              privateLabel="The report may be public, but this photo will never appear in Community."
+            />
+          </>
+        ) : null}
 
         <Text style={styles.inputLabel}>Report location</Text>
         <View style={styles.locationCard}>
@@ -275,7 +345,10 @@ function ReportScreen({ go }: { go: Go }) {
           <Pressable onPress={useLocation}><Text style={styles.link}>Use my current location</Text></Pressable>
         </View>
 
-        <View style={styles.noticeBox}><Text style={styles.noticeTitle}>Verification design</Text><Text style={styles.noticeText}>Every community report starts as unverified. Repetition alone does not make an allegation true.</Text></View>
+        <View style={styles.noticeBox}>
+          <Text style={styles.noticeTitle}>Privacy + verification</Text>
+          <Text style={styles.noticeText}>Every community report starts as unverified. Public/private controls affect publication; they do not change the report's verification status.</Text>
+        </View>
         <Pressable style={styles.primaryButton} disabled={busy} onPress={submit}><Text style={styles.primaryButtonText}>{busy ? 'Recording…' : 'Submit report'}</Text></Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -300,9 +373,14 @@ function AlertsScreen() {
 
 function CommunityScreen() {
   const { incidents } = useSentinel();
+  const publicIncidents = useMemo(
+    () => incidents.filter((incident) => incident.visibility !== 'private').slice(0, 5),
+    [incidents],
+  );
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent}>
-      <Header eyebrow="NEWS + COMMUNITY" title="Safety feed" subtitle="Official, community and safety content are deliberately labelled differently." />
+      <Header eyebrow="NEWS + COMMUNITY" title="Safety feed" subtitle="Only reports the reporter chose to make public can appear in Latest incident records." />
       {communityPosts.map((post) => (
         <View key={post.id} style={styles.card}>
           <View style={styles.sectionTitleRow}><Text style={styles.cardTitle}>{post.title}</Text><Pill label={post.tag} tone={post.tag === 'Official' ? 'success' : post.tag === 'Community' ? 'warning' : 'info'} /></View>
@@ -311,7 +389,9 @@ function CommunityScreen() {
         </View>
       ))}
       <Text style={styles.sectionTitle}>Latest incident records</Text>
-      {incidents.slice(0, 3).map((incident) => <IncidentCard key={incident.id} incident={incident} />)}
+      {publicIncidents.length ? publicIncidents.map((incident) => <IncidentCard key={incident.id} incident={incident} community />) : (
+        <View style={styles.noticeBox}><Text style={styles.noticeText}>No public incident records are available yet.</Text></View>
+      )}
     </ScrollView>
   );
 }
@@ -621,4 +701,18 @@ const styles = StyleSheet.create({
   locateText: { color: colors.tealDark, fontSize: 22, fontWeight: '900' },
   agentInput: { minHeight: 90 },
   agentActions: { flexDirection: 'row', gap: 10, marginVertical: 14 },
+  privacyChoiceRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  privacyChoice: { flex: 1, borderWidth: 1, borderColor: colors.line, backgroundColor: '#FFFFFF', borderRadius: 15, padding: 13, minHeight: 98 },
+  privacyChoiceActive: { borderColor: colors.teal, backgroundColor: '#E5F2F1' },
+  privacyChoiceTitle: { color: colors.ink, fontWeight: '900', fontSize: 14 },
+  privacyChoiceTitleActive: { color: colors.tealDark },
+  privacyChoiceText: { color: colors.muted, fontSize: 11, lineHeight: 15, marginTop: 5 },
+  privacyChoiceTextActive: { color: '#315E60' },
+  frequencyLegend: { backgroundColor: '#FFFFFF', marginHorizontal: 16, marginBottom: 10, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: 11 },
+  frequencyLegendTitle: { color: colors.ink, fontSize: 10, fontWeight: '900', letterSpacing: 0.8, marginBottom: 8 },
+  frequencyLegendRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 11, height: 11, borderRadius: 6, borderWidth: 1, borderColor: '#FFFFFF' },
+  legendText: { color: '#465A65', fontSize: 10, fontWeight: '800' },
+  frequencyLegendNote: { color: '#788991', fontSize: 9, lineHeight: 13, marginTop: 7 },
 });

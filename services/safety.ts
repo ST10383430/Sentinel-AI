@@ -12,30 +12,19 @@ export function distanceKm(a: Coords, b: Coords) {
   const dLon = toRadians(b.longitude - a.longitude);
   const lat1 = toRadians(a.latitude);
   const lat2 = toRadians(b.latitude);
-
-  const haversine =
-    Math.sin(dLat / 2) ** 2 +
-    Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
-
+  const haversine = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
 export function findRelevantIncidents(
   location: Coords,
   incidents: Incident[],
-  radiusKm = 1.5,
-  hoursBack = 12,
+  radiusKm = 2,
+  hoursBack = 7 * 24,
 ) {
   const cutoff = Date.now() - hoursBack * 60 * 60 * 1000;
-
   return incidents
-    .map((incident) => ({
-      incident,
-      distanceKm: distanceKm(location, incident),
-    }))
-    .filter(
-      ({ incident, distanceKm: distance }) =>
-        distance <= radiusKm && new Date(incident.created_at).getTime() >= cutoff,
-    )
+    .map((incident) => ({ incident, distanceKm: distanceKm(location, incident) }))
+    .filter(({ incident, distanceKm: distance }) => distance <= radiusKm && new Date(incident.created_at).getTime() >= cutoff)
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }

@@ -7,6 +7,7 @@ export type IncidentCategory =
   | 'Other';
 
 export type VerificationStatus = 'unverified' | 'corroborated' | 'official';
+export type Visibility = 'public' | 'private';
 
 export type Incident = {
   id: string;
@@ -19,6 +20,8 @@ export type Incident = {
   created_at: string;
   source?: 'community' | 'official' | 'demo';
   image_uri?: string | null;
+  visibility?: Visibility;
+  image_visibility?: Visibility;
 };
 
 export type SafetyNotification = {

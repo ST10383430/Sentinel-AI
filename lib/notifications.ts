@@ -1,19 +1,15 @@
 /**
- * Expo Go-safe notification adapter.
+ * Notification bridge for the Expo Go build.
  *
- * Android remote push notification support from expo-notifications is not
- * available in Expo Go on recent SDKs. Sentinel already maintains an in-app
- * Alerts feed in SentinelContext, so the Expo Go-compatible build uses that feed while
- * running in Expo Go and deliberately avoids importing expo-notifications at
- * runtime.
+ * Sentinel always records alerts in its in-app notification feed. We intentionally
+ * do not import expo-notifications in Expo Go because some Android Expo Go runtimes
+ * enter the remote-push code path at module load and crash with the SDK 53+ push
+ * notification restriction.
  *
- * For a later development build, this function can be replaced with a native
- * expo-notifications implementation without changing the rest of the app.
+ * When Sentinel moves to a custom development/production build, this module can be
+ * replaced with the native expo-notifications implementation.
  */
-export async function pushLocalNotification(title: string, body: string): Promise<void> {
-  // Keep this async so existing callers do not need to change.
-  // The visible notification is already added to Sentinel's in-app Alerts feed.
-  if (__DEV__) {
-    console.log(`[Sentinel notification] ${title}: ${body}`);
-  }
+export async function pushLocalNotification(_title: string, _body: string): Promise<void> {
+  // No-op in the Expo Go build. The alert is still added to Sentinel's in-app feed.
+  return;
 }
