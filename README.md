@@ -50,10 +50,10 @@ The database schema includes `image_uri` and `video_uri`, but local device file 
 3. Copy `.env.example` to `.env`.
 4. Fill in:
 
-```env
-EXPO_PUBLIC_SUPABASE_URL=...
-EXPO_PUBLIC_SUPABASE_ANON_KEY=...
-```
+   ```env
+   EXPO_PUBLIC_SUPABASE_URL=...
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+   ```
 
 5. Restart Expo with `npx expo start -c`.
 
@@ -72,6 +72,7 @@ Never place a Supabase service-role key or AI provider secret inside the mobile 
 ## Privacy + hotspot update
 
 This build adds:
+
 - public/private visibility per incident report
 - independent public/private visibility per attached photo and video
 - public Community feed filtering
@@ -91,7 +92,6 @@ npx expo start -c
 If you already created the Supabase tables with an older Sentinel schema, rerun `sql/schema.sql` so `incident_at`, `visibility`, `image_visibility`, `video_uri`, `video_visibility`, and `location_label` are added. `incident_at` stores when the event actually happened; `created_at` stores when the report was submitted.
 
 In this Expo Go-stable build, hotspot warnings are recorded in Sentinel's in-app Alerts feed. Background hotspot monitoring and native notification-tray alerts are reserved for a development/production build.
-
 
 ## Report location and private-report behaviour
 
