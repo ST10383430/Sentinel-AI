@@ -20,8 +20,11 @@ type NewIncident = {
   latitude: number;
   longitude: number;
   image_uri?: string | null;
+  video_uri?: string | null;
+  location_label?: string | null;
   visibility: Visibility;
   image_visibility: Visibility;
+  video_visibility: Visibility;
   incident_at: string;
 };
 
@@ -44,6 +47,8 @@ function normalizeIncident(incident: Incident): Incident {
     ...incident,
     visibility: incident.visibility ?? 'public',
     image_visibility: incident.image_visibility ?? 'private',
+    video_visibility: incident.video_visibility ?? 'private',
+    location_label: incident.location_label ?? null,
     incident_at: incident.incident_at ?? incident.created_at,
   };
 }

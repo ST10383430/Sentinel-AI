@@ -16,6 +16,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import EmergencyButton from './components/EmergencyButton';
 import SentinelMap from './components/SentinelMap';
 import IncidentCard from './components/IncidentCard';
+import LocationPicker from './components/LocationPicker';
+import VideoAttachment from './components/VideoAttachment';
 import Pill from './components/Pill';
 import { SentinelProvider, useSentinel } from './context/SentinelContext';
 import { communityPosts, DEMO_REGION } from './data/demoData';
@@ -234,23 +236,27 @@ function ReportScreen({ go }: { go: Go }) {
   const [description, setDescription] = useState('');
   const [incidentDate, setIncidentDate] = useState(() => localDateValue());
   const [incidentTime, setIncidentTime] = useState(() => localTimeValue());
-  const [latitudeText, setLatitudeText] = useState(() => DEMO_REGION.latitude.toFixed(6));
-  const [longitudeText, setLongitudeText] = useState(() => DEMO_REGION.longitude.toFixed(6));
+  const [location, setLocation] = useState({ latitude: DEMO_REGION.latitude, longitude: DEMO_REGION.longitude });
+  const [locationLabel, setLocationLabel] = useState('Loading current location…');
   const locationEdited = useRef(false);
   const [busy, setBusy] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
   const [reportVisibility, setReportVisibility] = useState<Visibility>('private');
   const [imageVisibility, setImageVisibility] = useState<Visibility>('private');
+  const [videoVisibility, setVideoVisibility] = useState<Visibility>('private');
 
   useEffect(() => {
     let cancelled = false;
     getCurrentLocation()
-      .then((location) => {
+      .then((current) => {
         if (cancelled || locationEdited.current) return;
-        setLatitudeText(location.latitude.toFixed(6));
-        setLongitudeText(location.longitude.toFixed(6));
+        setLocation(current);
+        setLocationLabel('Current location');
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled && !locationEdited.current) setLocationLabel('Johannesburg demo region');
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -274,15 +280,23 @@ function ReportScreen({ go }: { go: Go }) {
     }
   }
 
-  async function useLocation() {
+  async function addVideo(source: 'library' | 'camera') {
     try {
-      const location = await getCurrentLocation();
-      locationEdited.current = true;
-      setLatitudeText(location.latitude.toFixed(6));
-      setLongitudeText(location.longitude.toFixed(6));
-      Alert.alert('Location updated', 'Your current coordinates are now set as the incident location. You can still edit them before submitting.');
-    } catch {
-      Alert.alert('Location unavailable', 'Enter the incident latitude and longitude manually.');
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Camera permission required', 'Allow camera access to record a video for the report.');
+          return;
+        }
+      }
+
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['videos'], videoMaxDuration: 60 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'] });
+
+      if (!result.canceled && result.assets[0]?.uri) setVideoUri(result.assets[0].uri);
+    } catch (error) {
+      Alert.alert('Unable to add video', error instanceof Error ? error.message : 'Please try again.');
     }
   }
 
@@ -292,10 +306,8 @@ function ReportScreen({ go }: { go: Go }) {
       return;
     }
 
-    const latitude = Number(latitudeText.trim());
-    const longitude = Number(longitudeText.trim());
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-      Alert.alert('Check incident location', 'Enter valid latitude and longitude coordinates, or tap “Use my current location”.');
+    if (!Number.isFinite(location.latitude) || location.latitude < -90 || location.latitude > 90 || !Number.isFinite(location.longitude) || location.longitude < -180 || location.longitude > 180) {
+      Alert.alert('Check incident location', 'Choose a valid location using search, the map pin, or your current location.');
       return;
     }
 
@@ -312,19 +324,24 @@ function ReportScreen({ go }: { go: Go }) {
       const { incident, synced } = await addIncident({
         category,
         description: description.trim(),
-        latitude,
-        longitude,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        location_label: locationLabel,
         incident_at: incidentAt,
         image_uri: imageUri,
+        video_uri: videoUri,
         visibility: reportVisibility,
         image_visibility: imageUri ? imageVisibility : 'private',
+        video_visibility: videoUri ? videoVisibility : 'private',
       });
 
       const wasPublic = reportVisibility === 'public';
       setDescription('');
       setImageUri(null);
+      setVideoUri(null);
       setReportVisibility('private');
       setImageVisibility('private');
+      setVideoVisibility('private');
       const now = new Date();
       setIncidentDate(localDateValue(now));
       setIncidentTime(localTimeValue(now));
@@ -334,7 +351,7 @@ function ReportScreen({ go }: { go: Go }) {
         'Report recorded',
         wasPublic
           ? `The unverified report is public and can appear on the map/community feed. It was ${storageText}.`
-          : `The unverified report is private and will not appear on the public map or community feed. It was ${storageText}.`,
+          : `The unverified report is private and will not appear on the public map or community feed. Sentinel still uses it privately for Safety Mode and safety intelligence. It was ${storageText}.`,
         wasPublic
           ? [
               { text: 'View map', onPress: () => go('Map', { latitude: incident.latitude, longitude: incident.longitude }) },
@@ -350,7 +367,7 @@ function ReportScreen({ go }: { go: Go }) {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <Header eyebrow="OBSERVE · RECORD · REVIEW" title="Report an incident" subtitle="You control what is shared publicly. Private reports and private photos are excluded from the public community feed." />
+        <Header eyebrow="OBSERVE · RECORD · REVIEW" title="Report an incident" subtitle="You control what is shared publicly. Private reports stay off the public map/feed but can still improve your Safety Mode and Sentinel intelligence." />
 
         <Text style={styles.inputLabel}>Incident category</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRowNoPad}>
@@ -402,10 +419,10 @@ function ReportScreen({ go }: { go: Go }) {
           value={reportVisibility}
           onChange={setReportVisibility}
           publicLabel="Can appear on the safety map and Community feed."
-          privateLabel="Kept out of public map and Community records."
+          privateLabel="Hidden from the public map/feed, but still considered by your Safety Mode and Sentinel intelligence."
         />
 
-        <Text style={styles.inputLabel}>Image (optional)</Text>
+        <Text style={styles.inputLabel}>Photo (optional)</Text>
         <View style={styles.imagePickerCard}>
           {imageUri ? <Image source={{ uri: imageUri }} style={styles.reportImagePreview} resizeMode="cover" /> : (
             <View style={styles.imagePlaceholder}>
@@ -432,41 +449,48 @@ function ReportScreen({ go }: { go: Go }) {
           </>
         ) : null}
 
-        <Text style={styles.inputLabel}>Incident location</Text>
-        <View style={styles.locationCard}>
-          <View style={styles.fieldRow}>
-            <View style={styles.fieldHalf}>
-              <Text style={styles.coordinateLabel}>Latitude</Text>
-              <TextInput
-                value={latitudeText}
-                onChangeText={(value) => { locationEdited.current = true; setLatitudeText(value); }}
-                placeholder="-26.204100"
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={styles.compactInput}
-                placeholderTextColor="#98A5AC"
-              />
+        <Text style={styles.inputLabel}>Video (optional)</Text>
+        <View style={styles.imagePickerCard}>
+          {videoUri ? <VideoAttachment uri={videoUri} label="Selected report video" /> : (
+            <View style={styles.imagePlaceholder}>
+              <Text style={styles.imagePlaceholderIcon}>▶</Text>
+              <Text style={styles.imagePlaceholderText}>Attach or record a short video if it helps document the incident. Video is optional.</Text>
             </View>
-            <View style={styles.fieldHalf}>
-              <Text style={styles.coordinateLabel}>Longitude</Text>
-              <TextInput
-                value={longitudeText}
-                onChangeText={(value) => { locationEdited.current = true; setLongitudeText(value); }}
-                placeholder="28.047300"
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={styles.compactInput}
-                placeholderTextColor="#98A5AC"
-              />
-            </View>
+          )}
+          <View style={styles.imageActionRow}>
+            <Pressable style={styles.imageActionButton} onPress={() => addVideo('library')}><Text style={styles.imageActionText}>Choose video</Text></Pressable>
+            <Pressable style={styles.imageActionButton} onPress={() => addVideo('camera')}><Text style={styles.imageActionText}>Record video</Text></Pressable>
+            {videoUri ? <Pressable style={styles.imageRemoveButton} onPress={() => setVideoUri(null)}><Text style={styles.imageRemoveText}>Remove</Text></Pressable> : null}
           </View>
-          <Text style={styles.helperText}>Edit these coordinates if the incident happened somewhere other than where you are now.</Text>
-          <Pressable onPress={useLocation}><Text style={styles.link}>Use my current location</Text></Pressable>
         </View>
+
+        {videoUri ? (
+          <>
+            <Text style={styles.inputLabel}>Who can see this video?</Text>
+            <PrivacyChoice
+              value={videoVisibility}
+              onChange={setVideoVisibility}
+              publicLabel="If the report is public, the video is obscured until a viewer taps to reveal it."
+              privateLabel="The report may be public, but this video will never appear in Community."
+            />
+          </>
+        ) : null}
+
+        <Text style={styles.inputLabel}>Incident location</Text>
+        <Text style={styles.helperText}>Search for an area/street, tap the map, drag the pin, or use your current location. Sentinel stores coordinates internally so you do not need to know them.</Text>
+        <LocationPicker
+          value={location}
+          label={locationLabel}
+          onChange={(nextLocation, nextLabel) => {
+            locationEdited.current = true;
+            setLocation(nextLocation);
+            setLocationLabel(nextLabel);
+          }}
+        />
 
         <View style={styles.noticeBox}>
           <Text style={styles.noticeTitle}>Privacy + verification</Text>
-          <Text style={styles.noticeText}>Every community report starts as unverified. Public/private controls affect publication; they do not change the report's verification status.</Text>
+          <Text style={styles.noticeText}>Every community report starts as unverified. Private reports are excluded from the public Community feed and map, but remain available to the user's Safety Mode and Sentinel intelligence calculations.</Text>
         </View>
         <Pressable style={styles.primaryButton} disabled={busy} onPress={submit}><Text style={styles.primaryButtonText}>{busy ? 'Recording…' : 'Submit report'}</Text></Pressable>
       </ScrollView>

@@ -31,6 +31,7 @@ function buildMapHtml(incidents: Incident[], center: Coords, userLocation: Coord
       id: incident.id,
       category: incident.category,
       description: incident.description,
+      location_label: incident.location_label ?? '',
       latitude: incident.latitude,
       longitude: incident.longitude,
       status: incident.status,
@@ -52,6 +53,7 @@ function buildMapHtml(incidents: Incident[], center: Coords, userLocation: Coord
     .sentinel-popup strong { color: #071D27; font-size: 14px; }
     .sentinel-popup .status { color: #087B78; font-weight: 700; text-transform: capitalize; margin: 4px 0; }
     .sentinel-popup .frequency { color: #334155; font-weight: 800; font-size: 12px; margin: 6px 0; }
+    .sentinel-popup .location { color:#607681; font-size:11px; font-weight:700; margin:5px 0; max-width:220px; }
     .sentinel-popup .desc { color: #4F636E; line-height: 1.35; max-width: 220px; }
     .sentinel-popup .time { color: #7C8A92; font-size: 11px; margin-top: 7px; }
   </style>
@@ -91,6 +93,7 @@ function buildMapHtml(incidents: Incident[], center: Coords, userLocation: Coord
           '<div class="sentinel-popup"><strong>' + esc(incident.category) + '</strong>' +
           '<div class="status">' + esc(incident.status) + '</div>' +
           '<div class="frequency">' + esc(frequencyText) + '</div>' +
+          (incident.location_label ? '<div class="location">⌖ ' + esc(incident.location_label) + '</div>' : '') +
           '<div class="desc">' + esc(incident.description) + '</div>' +
           '<div class="time">' + esc(new Date(incident.incident_at).toLocaleString()) + '</div></div>'
         );

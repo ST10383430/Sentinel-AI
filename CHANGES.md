@@ -2,11 +2,13 @@
 
 This build adds:
 
-- Editable incident date and time on the Report an Incident screen. Both default to the current local date/time.
-- A separate `incident_at` timestamp so Sentinel can distinguish when an incident happened from when the report was submitted.
-- Editable incident latitude and longitude fields, plus a "Use my current location" shortcut.
-- Three session-only demo incidents placed within 1 km of the device's current location at startup (with a Johannesburg demo-region fallback when location is unavailable).
-- Hotspot colouring, Safety Mode recency checks, map popup times, community cards, and agent recency now use the incident occurrence time rather than only the report submission time.
-- Supabase schema migration for `incident_at`.
+- Optional incident **video evidence** from the device library or camera.
+- Separate public/private visibility for videos, matching photo privacy.
+- Public Community videos start blurred/obscured and require an explicit tap to reveal; they can be blurred again.
+- Private reports remain excluded from the Community feed and public map while still being considered by Safety Mode and Sentinel Agent safety analysis.
+- A user-friendly incident location picker: search by South African area/street/landmark, tap the map, drag the pin, or use current GPS location. Coordinates are retained internally rather than exposed as the main editing method.
+- Optional human-readable `location_label` saved with incidents and displayed on public incident cards/map popups.
+- Supabase schema fields for `video_uri`, `video_visibility`, and `location_label`.
+- Native Expo video playback (`expo-video`) and Android-capable blur (`expo-blur`), both supported by Expo Go for this SDK line.
 
-The Expo Go-stable notification behaviour is unchanged: hotspot alerts appear in Sentinel's in-app Alerts feed; native notification-tray alerts remain deferred to the development/production build.
+Existing editable incident date/time, startup nearby sample incidents, hotspot colouring, Safety Mode, Sentinel Agent, panic flow, and Expo Go-stable in-app alerts remain in place.

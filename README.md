@@ -19,7 +19,7 @@ If PowerShell blocks npm/npx scripts, use Command Prompt in VS Code or run `npm.
 - Safe-area-aware Android layout so content stays below the status bar and above Android navigation controls.
 - Large bottom navigation targets.
 - Safety map implemented with a WebView + Leaflet/OpenStreetMap to avoid the black native-map issue seen on some Expo Go Android devices.
-- Incident reporting with category, description, **editable incident date/time**, **editable incident coordinates**, and an **optional image** from the camera or gallery.
+- Incident reporting with category, description, **editable incident date/time**, a **searchable/tappable map location picker**, and optional **photo + video evidence**.
 - Alerts and community/news feed.
 - Safety Mode and Sentinel Agent.
 - Large panic button at the top of the Home screen.
@@ -37,9 +37,11 @@ The configured emergency contact in this build is `0736598718`. Before wider dep
 
 Emergency audio is **not hidden listening**. Recording starts only after the user activates panic mode and grants microphone permission, and Sentinel displays a visible recording indicator and Stop control. In the Expo Go configuration used here, recording is foreground-only.
 
-## Image attachments
+## Photo and video attachments
 
-Selected incident images are displayed immediately in the current app session. The database schema includes `image_uri`, but local device file URIs are not uploaded to Supabase Storage automatically. Add a private storage bucket/upload pipeline before relying on attachments across multiple devices.
+Selected incident photos and videos are displayed immediately in the current app session. Each attachment has its own public/private visibility control. Public media in Community starts obscured/blurred and requires the viewer to reveal it.
+
+The database schema includes `image_uri` and `video_uri`, but local device file URIs are not uploaded to Supabase Storage automatically. Add a private storage bucket/upload pipeline before relying on attachments across multiple devices.
 
 ## Optional Supabase
 
@@ -71,9 +73,9 @@ Never place a Supabase service-role key or AI provider secret inside the mobile 
 
 This build adds:
 - public/private visibility per incident report
-- independent public/private visibility per attached photo
+- independent public/private visibility per attached photo and video
 - public Community feed filtering
-- blurred public evidence images with tap-to-reveal
+- blurred/obscured public evidence media with tap-to-reveal
 - frequency-coloured map markers: green = 1, amber = 2, red = 3+ reports within ~750 m in the last 7 days, grey = older
 - preloaded sample incident clusters for demonstrating the map frequency key
 - 2 km foreground Safety Mode alerts recorded in Sentinel's in-app Alerts feed in the Expo Go build
@@ -86,9 +88,16 @@ npx expo install --fix
 npx expo start -c
 ```
 
-If you already created the Supabase tables with an older Sentinel schema, rerun `sql/schema.sql` so `incident_at`, `visibility`, and `image_visibility` are added. `incident_at` stores when the event actually happened; `created_at` stores when the report was submitted.
+If you already created the Supabase tables with an older Sentinel schema, rerun `sql/schema.sql` so `incident_at`, `visibility`, `image_visibility`, `video_uri`, `video_visibility`, and `location_label` are added. `incident_at` stores when the event actually happened; `created_at` stores when the report was submitted.
 
 In this Expo Go-stable build, hotspot warnings are recorded in Sentinel's in-app Alerts feed. Background hotspot monitoring and native notification-tray alerts are reserved for a development/production build.
+
+
+## Report location and private-report behaviour
+
+The report form no longer expects ordinary users to type coordinates. Reporters can search a South African suburb/street/landmark, tap or drag a pin on the map, or use their current GPS location. Coordinates are still stored internally for hotspot and distance calculations.
+
+A report marked **private** is excluded from the public Community feed and public map. It remains in Sentinel's incident set for that user, so Safety Mode scans and Sentinel Agent deliberations can still consider it without publishing the report or its exact public location.
 
 ## Expo Go notification note
 

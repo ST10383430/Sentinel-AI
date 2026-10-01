@@ -23,8 +23,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Sentinel to access photos you choose to attach to incident reports.",
-          "cameraPermission": "Allow Sentinel to use the camera to attach an image to an incident report."
+          "photosPermission": "Allow Sentinel to access photos and videos you choose to attach to incident reports.",
+          "cameraPermission": "Allow Sentinel to use the camera to capture photos or videos for an incident report."
         }
       ],
       [

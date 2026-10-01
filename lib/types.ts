@@ -21,8 +21,11 @@ export type Incident = {
   incident_at?: string;
   source?: 'community' | 'official' | 'demo';
   image_uri?: string | null;
+  video_uri?: string | null;
+  location_label?: string | null;
   visibility?: Visibility;
   image_visibility?: Visibility;
+  video_visibility?: Visibility;
 };
 
 export type SafetyNotification = {

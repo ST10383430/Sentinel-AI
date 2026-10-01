@@ -18,7 +18,9 @@
     "expo-audio": "~57.0.5",
     "expo-image-picker": "~57.0.20",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-webview": "13.16.1"
+    "react-native-webview": "13.16.1",
+    "expo-video": "~57.0.5",
+    "expo-blur": "~57.0.3"
   },
   "devDependencies": {
     "@types/react": "~19.2.0",

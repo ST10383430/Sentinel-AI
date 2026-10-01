@@ -14,8 +14,11 @@ function fromRow(row: Record<string, unknown>): Incident {
     incident_at: row.incident_at ? String(row.incident_at) : String(row.created_at),
     source: 'community',
     image_uri: row.image_uri ? String(row.image_uri) : null,
+    video_uri: row.video_uri ? String(row.video_uri) : null,
+    location_label: row.location_label ? String(row.location_label) : null,
     visibility: (row.visibility as Incident['visibility']) ?? 'public',
     image_visibility: (row.image_visibility as Incident['image_visibility']) ?? 'private',
+    video_visibility: (row.video_visibility as Incident['video_visibility']) ?? 'private',
   };
 }
 
@@ -33,27 +36,25 @@ export async function persistIncident(incident: Incident): Promise<boolean> {
     created_at: incident.created_at,
     incident_at: incident.incident_at ?? incident.created_at,
     image_uri: incident.image_uri?.startsWith('http') ? incident.image_uri : null,
+    video_uri: incident.video_uri?.startsWith('http') ? incident.video_uri : null,
+    location_label: incident.location_label ?? null,
     visibility: incident.visibility ?? 'public',
     image_visibility: incident.image_visibility ?? 'private',
+    video_visibility: incident.video_visibility ?? 'private',
   };
 
   const { error } = await supabase.from('incidents').insert(fullRow);
   if (!error) return true;
 
-  // First retry without the newer incident_at column. This keeps privacy settings
-  // intact for projects that have not yet run the latest schema migration.
-  const { incident_at: _incidentAt, ...privacyCompatibleRow } = fullRow;
-  const { error: privacyCompatibleError } = await supabase.from('incidents').insert(privacyCompatibleRow);
-  if (!privacyCompatibleError) return true;
-
-  // If the user's existing Supabase table has not yet had the privacy migration,
-  // never downgrade a private report into a public cloud record.
+  // Never downgrade a private report into a legacy public cloud record. Keep it
+  // on-device until the current privacy schema is installed.
   if ((incident.visibility ?? 'public') === 'private') {
-    console.warn('Private incident kept on-device until the Supabase privacy migration is applied.', privacyCompatibleError.message);
+    console.warn('Private incident kept on-device until the latest Supabase schema is applied.', error.message);
     return false;
   }
 
-  // Public reports can fall back to the older schema so the demo remains usable.
+  // Public reports can fall back to the original minimal schema so an older demo
+  // database does not stop the app. Media/local labels remain available in session state.
   const { error: fallbackError } = await supabase.from('incidents').insert({
     id: incident.id,
     category: incident.category,
