@@ -19,10 +19,10 @@ function frequencyColour(count: number) {
 function buildMapHtml(incidents: Incident[], center: Coords, userLocation: Coords | null) {
   const cutoff = Date.now() - SEVEN_DAYS_MS;
   const markerData = incidents.map((incident) => {
-    const isRecent = new Date(incident.created_at).getTime() >= cutoff;
+    const isRecent = new Date(incident.incident_at ?? incident.created_at).getTime() >= cutoff;
     const frequency = isRecent
       ? incidents.filter((other) =>
-          new Date(other.created_at).getTime() >= cutoff &&
+          new Date(other.incident_at ?? other.created_at).getTime() >= cutoff &&
           distanceKm(incident, other) <= CLUSTER_RADIUS_KM,
         ).length
       : 0;
@@ -37,6 +37,7 @@ function buildMapHtml(incidents: Incident[], center: Coords, userLocation: Coord
       frequency,
       color: frequencyColour(frequency),
       created_at: incident.created_at,
+      incident_at: incident.incident_at ?? incident.created_at,
     };
   });
 
@@ -91,7 +92,7 @@ function buildMapHtml(incidents: Incident[], center: Coords, userLocation: Coord
           '<div class="status">' + esc(incident.status) + '</div>' +
           '<div class="frequency">' + esc(frequencyText) + '</div>' +
           '<div class="desc">' + esc(incident.description) + '</div>' +
-          '<div class="time">' + esc(new Date(incident.created_at).toLocaleString()) + '</div></div>'
+          '<div class="time">' + esc(new Date(incident.incident_at).toLocaleString()) + '</div></div>'
         );
       });
 
@@ -124,7 +125,7 @@ export default function SentinelMap({ incidents, center, userLocation }: { incid
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const html = useMemo(() => buildMapHtml(incidents, center, userLocation), [incidents, center, userLocation]);
-  const mapKey = `${center.latitude.toFixed(4)}-${center.longitude.toFixed(4)}-${incidents.map((x) => `${x.id}:${x.created_at}`).join('|')}-${userLocation?.latitude ?? 'x'}`;
+  const mapKey = `${center.latitude.toFixed(4)}-${center.longitude.toFixed(4)}-${incidents.map((x) => `${x.id}:${x.incident_at ?? x.created_at}`).join('|')}-${userLocation?.latitude ?? 'x'}`;
 
   return (
     <View style={styles.container}>

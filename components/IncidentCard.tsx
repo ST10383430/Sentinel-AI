@@ -41,7 +41,8 @@ export default function IncidentCard({ incident, community = false }: { incident
       ) : null}
 
       <Text style={styles.body}>{incident.description}</Text>
-      <Text style={styles.meta}>{new Date(incident.created_at).toLocaleString()}</Text>
+      <Text style={styles.meta}>Incident: {new Date(incident.incident_at ?? incident.created_at).toLocaleString()}</Text>
+      {incident.incident_at && incident.incident_at !== incident.created_at ? <Text style={styles.meta}>Reported: {new Date(incident.created_at).toLocaleString()}</Text> : null}
     </View>
   );
 }

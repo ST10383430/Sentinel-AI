@@ -51,6 +51,34 @@ const categories: IncidentCategory[] = [
   'Other',
 ];
 
+
+const twoDigits = (value: number) => String(value).padStart(2, '0');
+const localDateValue = (date = new Date()) => `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`;
+const localTimeValue = (date = new Date()) => `${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
+
+function incidentDateTimeIso(dateText: string, timeText: string): string {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText.trim());
+  const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(timeText.trim());
+  if (!dateMatch) throw new Error('Enter the incident date as YYYY-MM-DD.');
+  if (!timeMatch) throw new Error('Enter the incident time as HH:MM, for example 21:45.');
+
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const day = Number(dateMatch[3]);
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) throw new Error('Enter a valid 24-hour incident time.');
+
+  const value = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (
+    value.getFullYear() !== year || value.getMonth() !== month - 1 || value.getDate() !== day ||
+    value.getHours() !== hour || value.getMinutes() !== minute
+  ) throw new Error('Enter a valid incident date and time.');
+
+  if (value.getTime() > Date.now() + 5 * 60 * 1000) throw new Error('The incident time cannot be in the future.');
+  return value.toISOString();
+}
+
 function Header({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
   return (
     <View style={styles.header}>
@@ -204,11 +232,27 @@ function ReportScreen({ go }: { go: Go }) {
   const { addIncident } = useSentinel();
   const [category, setCategory] = useState<IncidentCategory>('Robbery');
   const [description, setDescription] = useState('');
-  const [coords, setCoords] = useState({ latitude: DEMO_REGION.latitude, longitude: DEMO_REGION.longitude });
+  const [incidentDate, setIncidentDate] = useState(() => localDateValue());
+  const [incidentTime, setIncidentTime] = useState(() => localTimeValue());
+  const [latitudeText, setLatitudeText] = useState(() => DEMO_REGION.latitude.toFixed(6));
+  const [longitudeText, setLongitudeText] = useState(() => DEMO_REGION.longitude.toFixed(6));
+  const locationEdited = useRef(false);
   const [busy, setBusy] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [reportVisibility, setReportVisibility] = useState<Visibility>('private');
   const [imageVisibility, setImageVisibility] = useState<Visibility>('private');
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentLocation()
+      .then((location) => {
+        if (cancelled || locationEdited.current) return;
+        setLatitudeText(location.latitude.toFixed(6));
+        setLongitudeText(location.longitude.toFixed(6));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   async function addImage(source: 'library' | 'camera') {
     try {
@@ -233,10 +277,12 @@ function ReportScreen({ go }: { go: Go }) {
   async function useLocation() {
     try {
       const location = await getCurrentLocation();
-      setCoords(location);
-      Alert.alert('Location added', 'Your current coordinates will be used for this report.');
+      locationEdited.current = true;
+      setLatitudeText(location.latitude.toFixed(6));
+      setLongitudeText(location.longitude.toFixed(6));
+      Alert.alert('Location updated', 'Your current coordinates are now set as the incident location. You can still edit them before submitting.');
     } catch {
-      Alert.alert('Location unavailable', 'Keeping the default map location.');
+      Alert.alert('Location unavailable', 'Enter the incident latitude and longitude manually.');
     }
   }
 
@@ -245,12 +291,30 @@ function ReportScreen({ go }: { go: Go }) {
       Alert.alert('Add a description', 'Briefly describe what was observed.');
       return;
     }
+
+    const latitude = Number(latitudeText.trim());
+    const longitude = Number(longitudeText.trim());
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      Alert.alert('Check incident location', 'Enter valid latitude and longitude coordinates, or tap “Use my current location”.');
+      return;
+    }
+
+    let incidentAt: string;
+    try {
+      incidentAt = incidentDateTimeIso(incidentDate, incidentTime);
+    } catch (error) {
+      Alert.alert('Check incident time', error instanceof Error ? error.message : 'Enter a valid incident date and time.');
+      return;
+    }
+
     setBusy(true);
     try {
       const { incident, synced } = await addIncident({
         category,
         description: description.trim(),
-        ...coords,
+        latitude,
+        longitude,
+        incident_at: incidentAt,
         image_uri: imageUri,
         visibility: reportVisibility,
         image_visibility: imageUri ? imageVisibility : 'private',
@@ -261,6 +325,9 @@ function ReportScreen({ go }: { go: Go }) {
       setImageUri(null);
       setReportVisibility('private');
       setImageVisibility('private');
+      const now = new Date();
+      setIncidentDate(localDateValue(now));
+      setIncidentTime(localTimeValue(now));
 
       const storageText = synced ? 'saved securely' : 'kept in this app session';
       Alert.alert(
@@ -304,6 +371,32 @@ function ReportScreen({ go }: { go: Go }) {
           placeholderTextColor="#98A5AC"
         />
 
+        <View style={styles.fieldRow}>
+          <View style={styles.fieldHalf}>
+            <Text style={styles.inputLabel}>Incident date</Text>
+            <TextInput
+              value={incidentDate}
+              onChangeText={setIncidentDate}
+              placeholder="YYYY-MM-DD"
+              autoCapitalize="none"
+              style={styles.compactInput}
+              placeholderTextColor="#98A5AC"
+            />
+          </View>
+          <View style={styles.fieldHalf}>
+            <Text style={styles.inputLabel}>Time of incident</Text>
+            <TextInput
+              value={incidentTime}
+              onChangeText={setIncidentTime}
+              placeholder="HH:MM"
+              keyboardType="numbers-and-punctuation"
+              style={styles.compactInput}
+              placeholderTextColor="#98A5AC"
+            />
+          </View>
+        </View>
+        <Text style={styles.helperText}>Defaults to now. Edit the date or time if you are reporting after leaving the incident.</Text>
+
         <Text style={styles.inputLabel}>Who can see this report?</Text>
         <PrivacyChoice
           value={reportVisibility}
@@ -339,9 +432,35 @@ function ReportScreen({ go }: { go: Go }) {
           </>
         ) : null}
 
-        <Text style={styles.inputLabel}>Report location</Text>
+        <Text style={styles.inputLabel}>Incident location</Text>
         <View style={styles.locationCard}>
-          <Text style={styles.coords}>{coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}</Text>
+          <View style={styles.fieldRow}>
+            <View style={styles.fieldHalf}>
+              <Text style={styles.coordinateLabel}>Latitude</Text>
+              <TextInput
+                value={latitudeText}
+                onChangeText={(value) => { locationEdited.current = true; setLatitudeText(value); }}
+                placeholder="-26.204100"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.compactInput}
+                placeholderTextColor="#98A5AC"
+              />
+            </View>
+            <View style={styles.fieldHalf}>
+              <Text style={styles.coordinateLabel}>Longitude</Text>
+              <TextInput
+                value={longitudeText}
+                onChangeText={(value) => { locationEdited.current = true; setLongitudeText(value); }}
+                placeholder="28.047300"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.compactInput}
+                placeholderTextColor="#98A5AC"
+              />
+            </View>
+          </View>
+          <Text style={styles.helperText}>Edit these coordinates if the incident happened somewhere other than where you are now.</Text>
           <Pressable onPress={useLocation}><Text style={styles.link}>Use my current location</Text></Pressable>
         </View>
 
@@ -675,6 +794,11 @@ const styles = StyleSheet.create({
   mapLegendText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12, textAlign: 'center' },
   inputLabel: { color: colors.ink, fontWeight: '900', marginTop: 10, marginBottom: 8 },
   textArea: { minHeight: 140, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 15, textAlignVertical: 'top', color: colors.ink, fontSize: 15 },
+  fieldRow: { flexDirection: 'row', gap: 10 },
+  fieldHalf: { flex: 1 },
+  compactInput: { minHeight: 50, backgroundColor: '#FFFFFF', borderRadius: 13, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 13, paddingVertical: 11, color: colors.ink, fontSize: 14 },
+  helperText: { color: '#7A8A92', fontSize: 10, lineHeight: 14, marginTop: 6, marginBottom: 8 },
+  coordinateLabel: { color: colors.muted, fontWeight: '800', fontSize: 11, marginBottom: 6 },
   imagePickerCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 12, marginBottom: 14 },
   reportImagePreview: { width: '100%', height: 210, borderRadius: 13, backgroundColor: '#E7ECEF' },
   imagePlaceholder: { minHeight: 125, borderRadius: 13, backgroundColor: '#EEF3F5', alignItems: 'center', justifyContent: 'center', padding: 20 },

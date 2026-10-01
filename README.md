@@ -19,13 +19,14 @@ If PowerShell blocks npm/npx scripts, use Command Prompt in VS Code or run `npm.
 - Safe-area-aware Android layout so content stays below the status bar and above Android navigation controls.
 - Large bottom navigation targets.
 - Safety map implemented with a WebView + Leaflet/OpenStreetMap to avoid the black native-map issue seen on some Expo Go Android devices.
-- Incident reporting with category, description, location and an **optional image** from the camera or gallery.
+- Incident reporting with category, description, **editable incident date/time**, **editable incident coordinates**, and an **optional image** from the camera or gallery.
 - Alerts and community/news feed.
 - Safety Mode and Sentinel Agent.
 - Large panic button at the top of the Home screen.
 - Panic activation captures GPS and begins **visible emergency audio recording** after microphone permission is granted.
 - SOS message composer pre-filled for **0736598718** with current coordinates and a Google Maps link.
 - Emergency call action opens the dialer for **0736598718**.
+- On startup Sentinel places **3 session-only demo incidents within 1 km of the current GPS location** (or the fallback demo region if GPS is unavailable), so hotspot/Safety Mode behaviour can be demonstrated immediately.
 - Optional Supabase persistence and realtime incident updates.
 
 ## Emergency behaviour
@@ -85,9 +86,9 @@ npx expo install --fix
 npx expo start -c
 ```
 
-If you already created the Supabase tables with an older Sentinel schema, rerun `sql/schema.sql` so the `visibility` and `image_visibility` columns are added.
+If you already created the Supabase tables with an older Sentinel schema, rerun `sql/schema.sql` so `incident_at`, `visibility`, and `image_visibility` are added. `incident_at` stores when the event actually happened; `created_at` stores when the report was submitted.
 
-Local Android notifications work in Expo Go; Sentinel does not request a remote push token. Background hotspot monitoring still requires a development/production build later.
+In this Expo Go-stable build, hotspot warnings are recorded in Sentinel's in-app Alerts feed. Background hotspot monitoring and native notification-tray alerts are reserved for a development/production build.
 
 ## Expo Go notification note
 

@@ -8,8 +8,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { demoIncidents, demoNotifications } from '../data/demoData';
+import { createNearbyDemoIncidents, demoIncidents, demoNotifications, DEMO_REGION } from '../data/demoData';
 import { pushLocalNotification } from '../lib/notifications';
+import { getCurrentLocation } from '../lib/location';
 import { Incident, IncidentCategory, SafetyNotification, Visibility } from '../lib/types';
 import { fetchIncidents, persistIncident, subscribeToIncidents } from '../services/incidents';
 
@@ -21,6 +22,7 @@ type NewIncident = {
   image_uri?: string | null;
   visibility: Visibility;
   image_visibility: Visibility;
+  incident_at: string;
 };
 
 type NewNotification = Omit<SafetyNotification, 'id' | 'created_at'>;
@@ -42,6 +44,7 @@ function normalizeIncident(incident: Incident): Incident {
     ...incident,
     visibility: incident.visibility ?? 'public',
     image_visibility: incident.image_visibility ?? 'private',
+    incident_at: incident.incident_at ?? incident.created_at,
   };
 }
 
@@ -55,6 +58,7 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
   const [incidents, setIncidents] = useState<Incident[]>(demoIncidents.map(normalizeIncident));
   const [notifications, setNotifications] = useState<SafetyNotification[]>(demoNotifications);
   const knownIds = useRef(new Set(demoIncidents.map((item) => item.id)));
+  const nearbyDemoSeeded = useRef(false);
 
   const addNotification = useCallback((notification: NewNotification, options?: { push?: boolean }) => {
     setNotifications((current) => [
@@ -69,6 +73,24 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
   const track = useCallback((list: Incident[]) => {
     list.forEach((item) => knownIds.current.add(item.id));
   }, []);
+
+
+  useEffect(() => {
+    let cancelled = false;
+    if (nearbyDemoSeeded.current) return () => { cancelled = true; };
+    nearbyDemoSeeded.current = true;
+
+    getCurrentLocation()
+      .catch(() => ({ latitude: DEMO_REGION.latitude, longitude: DEMO_REGION.longitude }))
+      .then((location) => {
+        if (cancelled) return;
+        const nearby = createNearbyDemoIncidents(location).map(normalizeIncident);
+        track(nearby);
+        setIncidents((current) => mergeIncidents(current, nearby));
+      });
+
+    return () => { cancelled = true; };
+  }, [track]);
 
   useEffect(() => {
     let cancelled = false;

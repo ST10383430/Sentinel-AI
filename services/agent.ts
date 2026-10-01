@@ -99,7 +99,7 @@ async function runTool(name: string, input: Record<string, unknown>, deps: Agent
           severity: incident.severity,
           verification: incident.status,
           distance_km: +distanceKm.toFixed(2),
-          minutes_ago: Math.round((Date.now() - new Date(incident.created_at).getTime()) / 60000),
+          minutes_ago: Math.round((Date.now() - new Date(incident.incident_at ?? incident.created_at).getTime()) / 60000),
           description: incident.description.slice(0, 200),
         })),
       });

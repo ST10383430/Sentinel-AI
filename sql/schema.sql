@@ -10,12 +10,17 @@ create table if not exists incidents (
   severity text not null default 'medium',
   status text not null default 'unverified',
   created_at timestamptz not null default now(),
+  incident_at timestamptz not null default now(),
   image_uri text,
   visibility text not null default 'public',
   image_visibility text not null default 'private'
 );
 
 -- Safe migration for projects created from older Sentinel schemas.
+alter table incidents add column if not exists incident_at timestamptz;
+update incidents set incident_at = created_at where incident_at is null;
+alter table incidents alter column incident_at set default now();
+alter table incidents alter column incident_at set not null;
 alter table incidents add column if not exists image_uri text;
 alter table incidents add column if not exists visibility text not null default 'public';
 alter table incidents add column if not exists image_visibility text not null default 'private';

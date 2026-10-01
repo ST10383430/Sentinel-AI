@@ -18,6 +18,7 @@ export type Incident = {
   severity: 'low' | 'medium' | 'high';
   status: VerificationStatus;
   created_at: string;
+  incident_at?: string;
   source?: 'community' | 'official' | 'demo';
   image_uri?: string | null;
   visibility?: Visibility;
